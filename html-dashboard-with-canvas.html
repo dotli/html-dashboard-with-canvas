@@ -1,0 +1,317 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width">
+    <title>html-dashboard-with-canvas</title>
+    <style type="text/css">
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background-color: #26243c;
+        }
+
+        .container {
+            margin: 0 auto;
+            width: 400px;
+        }
+
+        .disk-wapper {
+            position: relative;
+            padding: 25px 0;
+            text-align: center;
+            height: 260px;
+        }
+
+        #disk2 {
+            position: absolute;
+            top: 220px;
+            left: 50px;
+        }
+
+        #disk3 {
+            position: absolute;
+            top: 220px;
+            right: 50px
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="disk-wapper">
+            <canvas id="disk" width="200" height="200"></canvas>
+            <canvas id="disk2" width="80" height="80"></canvas>
+            <canvas id="disk3" width="80" height="80"></canvas>
+        </div>
+    </div>
+    <script>
+
+        class Panel {
+            constructor(id, options) {
+                if (new.target === Panel) {
+                    throw new Error('Panel类不能被实例化');
+                }
+
+                this.options = options || {};
+
+                this.canvas = document.getElementById(id);
+                this.context = this.canvas.getContext('2d');
+                this.width = this.canvas.width;
+                this.height = this.canvas.height;
+                this.centerX = this.width / 2;
+                this.centerY = this.height / 2;
+
+                this.lineTotal = this.options.lineTotal || 60;
+                this.value = this.options.value || 0;
+                this.drawValue = 0;
+                this.interval = this.options.interval || 1000;
+                this.speed = (this.value) * 16 / this.interval;
+
+                this.deg = Math.PI * 2 / this.lineTotal;
+            }
+
+            save(fn) {
+                this.context.save();
+                fn();
+                this.context.restore();
+            }
+        }
+
+        class BodyPanel extends Panel {
+            constructor(id, options) {
+                super(id, options);
+                this.draw();
+            }
+
+            draw() {
+                this.context.save();
+                this.context.clearRect(0, 0, this.width, this.height);
+                this.context.translate(this.centerX, this.centerY);
+                this.context.rotate(Math.PI / 2);
+
+                // 成绩累加（动画效果）
+                if (this.drawValue < this.value - this.speed) {
+                    this.drawValue += this.speed;
+                } else if (this.drawValue >= (this.value - this.speed) && this.drawValue < this.value) {
+                    this.drawValue = this.value;
+                }
+
+                var p = this;
+                if (this.drawValue < this.value) {
+                    requestAnimationFrame(function () {
+                        p.draw();
+                    });
+                }
+
+                // 画内环刻度
+                this._drawInner();
+                // 画外环刻度
+                this._drawOuter();
+                // 画文本
+                this._drawText();
+                this.context.restore();
+            }
+
+            _drawInner() {
+                var p = this, ctx = this.context;
+                p.save(function () {
+                    for (var i = 0; i < p.lineTotal; i++) {
+                        ctx.beginPath();
+                        ctx.rotate(p.deg);
+                        ctx.moveTo(p.centerX - 29, 0);
+                        ctx.lineTo(p.centerX - 27, 0);
+                        ctx.lineWidth = 2;
+                        ctx.lineCap = 'round';
+                        ctx.strokeStyle = 'rgb(126, 94, 138)';
+                        ctx.stroke();
+                    }
+                });
+            }
+            _drawOuter() {
+                var p = this, ctx = this.context;
+                p.save(function () {
+                    var valueLine = Math.round(p.drawValue * p.lineTotal / 100);
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    for (var i = 1; i <= p.lineTotal; i++) {
+                        ctx.beginPath();
+                        if (i === valueLine) {
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = 'rgb(8,216,95)';
+                            ctx.strokeStyle = 'rgb(8,216,95)';
+                            ctx.moveTo(p.centerX - 22, 0);
+                            ctx.lineTo(p.centerX, 0);
+                        } else if (i < valueLine) {
+                            ctx.shadowBlur = 0;
+                            var R1 = 32, R2 = 8,
+                                G1 = 126, G2 = 216,
+                                B1 = 232, B2 = 95,
+                                R = R1 - Math.round(i * (R1 - R2) / valueLine),
+                                G = G1 + Math.round(i * (G2 - G1) / valueLine),
+                                B = B1 - Math.round(i * (B1 - B2) / valueLine);
+                            ctx.strokeStyle = 'rgb(' + R + ',' + G + ',' + B + ')';
+                            ctx.moveTo(p.centerX - 20, 0);
+                            ctx.lineTo(p.centerX - 5, 0);
+                        } else {
+                            ctx.shadowBlur = 0;
+                            ctx.strokeStyle = 'rgb(147,168,155)';
+                            ctx.moveTo(p.centerX - 20, 0);
+                            ctx.lineTo(p.centerX - 5, 0);
+                        }
+                        ctx.stroke();
+                        ctx.rotate(p.deg);
+                    }
+                });
+            }
+            _drawText() {
+                var p = this, ctx = this.context;
+                p.save(function () {
+
+                    ctx.fillStyle = 'rgb(126, 94, 138)';
+                    ctx.font = '12px Microsoft yahei';
+                    ctx.rotate(-(Math.PI / 2));
+
+                    let outerSpace = p.centerX - 35;
+                    let scale1 = '100';
+                    let scale1X = -(ctx.measureText(scale1).width / 2);
+                    ctx.fillText(scale1, scale1X, outerSpace);
+
+                    ctx.fillText('25', -outerSpace, 4);
+
+                    let scale3 = '50';
+                    let scale3X = -(ctx.measureText(scale3).width / 2);
+                    ctx.fillText(scale3, scale3X, -outerSpace + 8);
+
+                    let scale4 = '75';
+                    let scale4X = outerSpace - ctx.measureText(scale4).width
+                    ctx.fillText(scale4, scale4X, 4);
+
+                    ctx.textAlign = 'center';
+                    ctx.font = '38px Microsoft yahei';
+                    ctx.fillStyle = 'rgb(255, 255, 255)';
+                    ctx.fillText(p.drawValue.toFixed(1), 0, 4);
+
+                    ctx.font = '14px Microsoft yahei';
+                    ctx.fillStyle = '#7c7985';
+                    ctx.fillText('体 质 指 数', 0, 24);
+                });
+            }
+        }
+
+        class SimplePanel extends Panel {
+            constructor(id, options) {
+                super(id, options);
+                this.draw();
+            }
+
+            draw() {
+                this.context.save();
+                this.context.clearRect(0, 0, this.width, this.height);
+                this.context.translate(this.centerX, this.centerY);
+                this.context.rotate(Math.PI / 2);
+
+                // 成绩累加（动画效果）
+                if (this.drawValue < this.value - this.speed) {
+                    this.drawValue += this.speed;
+                } else if (this.drawValue >= (this.value - this.speed) && this.drawValue < this.value) {
+                    this.drawValue = this.value;
+                }
+
+                var p = this;
+                if (this.drawValue < this.value) {
+                    requestAnimationFrame(function () {
+                        p.draw();
+                    });
+                }
+                // 画外环刻度
+                this._drawOuter();
+                // 画文本
+                this._drawText();
+                this.context.restore();
+            }
+            _drawOuter() {
+                var p = this, ctx = this.context;
+                p.save(function () {
+                    var valueLine = Math.round(p.drawValue * p.lineTotal / 100);
+                    ctx.lineWidth = 1;
+                    ctx.lineCap = 'round';
+                    for (var i = 1; i <= p.lineTotal; i++) {
+                        ctx.beginPath();
+                        if (i === valueLine) {
+                            ctx.shadowBlur = 5;
+                            ctx.shadowColor = 'rgb(8,216,95)';
+                            ctx.strokeStyle = 'rgb(8,216,95)';
+                            ctx.moveTo(p.centerX - 12, 0);
+                            ctx.lineTo(p.centerX, 0);
+                        } else if (i < valueLine) {
+                            ctx.shadowBlur = 0;
+                            var R1 = 32, R2 = 8,
+                                G1 = 126, G2 = 216,
+                                B1 = 232, B2 = 95,
+                                R = R1 - Math.round(i * (R1 - R2) / valueLine),
+                                G = G1 + Math.round(i * (G2 - G1) / valueLine),
+                                B = B1 - Math.round(i * (B1 - B2) / valueLine);
+                            ctx.strokeStyle = 'rgb(' + R + ',' + G + ',' + B + ')';
+                            ctx.moveTo(p.centerX - 10, 0);
+                            ctx.lineTo(p.centerX - 5, 0);
+                        } else {
+                            ctx.shadowBlur = 0;
+                            ctx.strokeStyle = 'rgb(147,168,155)';
+                            ctx.moveTo(p.centerX - 10, 0);
+                            ctx.lineTo(p.centerX - 5, 0);
+                        }
+                        ctx.stroke();
+                        ctx.rotate(p.deg);
+                    }
+                });
+            }
+            _drawText() {
+                var p = this, ctx = this.context;
+                p.save(function () {
+
+                    ctx.rotate(-(Math.PI / 2));
+
+                    ctx.textAlign = 'center';
+                    ctx.font = '16px Microsoft yahei';
+                    ctx.fillStyle = 'rgb(255, 255, 255)';
+                    ctx.fillText(p.drawValue.toFixed(0) + p.options.unit, 0, 0);
+
+                    ctx.font = '12px Microsoft yahei';
+                    ctx.fillStyle = '#7c7985';
+                    ctx.fillText(p.options.desc, 0, 14);
+                });
+            }
+        }
+
+        new BodyPanel('disk', {
+            lineTotal: 52,
+            value: 57.3,
+            //speed: 0.85,
+            interval: 1000
+        });
+
+        new SimplePanel('disk2', {
+            lineTotal: 52,
+            value: 28,
+            //speed: 0.85,
+            interval: 1000,
+            unit: '分',
+            desc: '分 数'
+        });
+
+        new SimplePanel('disk3', {
+            lineTotal: 52,
+            value: 85,
+            //speed: 0.85,
+            interval: 1000,
+            unit: '%',
+            desc: '超 越'
+        });
+
+    </script>
+</body>
+</html>
